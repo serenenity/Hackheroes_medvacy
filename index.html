@@ -4,8 +4,280 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Medvacy by Hackheroes</title>
+   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>hello world!</h1>
+    <div>
+        <nav>
+            <div class="logo">
+                <h1><a href="./index.html">Madvacy</a></h1>
+            </div>
+            <div class="nav-buttons">
+                <ul>
+                    <li><a href="./dashboard.html">Dashboard</a></li>
+                    <li>Records</li>
+                    <li>Privacy</li>
+                    <li>Settings</li>
+                </ul>
+            </div>
+        </nav>
+       <div class="section-body">
+            <div class="section-user">
+                <h3> Enter ID </h3>
+                <div class="container">
+                    <input type="text" id="userId" autoFocus placeholder="Enter User ID"/>
+                </div>
+                <div id="upload-container">
+                  <p id="file-name"></p>
+                  <input type="file" id="fileUpload" style="display:none" >
+                  <label for="fileUpload" class="button-file">Choose a file</label>
+                </div>
+                <button id="uploadReport" style="cursor: pointer;
+                    display: block;
+                    padding:  .5rem;
+                    width: 30%;
+                    text-align: center;
+                    text-transform: capitalize;
+                    color: #fff;
+                    background-color: #20A93D ;
+                    border: none;">
+                                    Upload
+                </button>
+            </div>
+        </div>
+    
+     </div>
+
+
+     <script type="module">
+        const div = document.querySelector('div');
+
+        // Create a map of button IDs to handler functions
+        const buttonHandlers = new Map([
+        ['queryProtocol', queryProtocol],
+        ['configProtocol', configProtocol],
+        ['uploadReport', uploadReport],
+        // ['readBlog', readBlog],
+        ['seeDid', seeDid],
+        //['patient', patient],
+      ]);
+
+     
+    // async function patient(){
+    //   console.log("patient");
+    // }
+      
+
+        // Add an event listener to the div element
+        div.addEventListener('click', (event) => {
+        // Get the handler function for the clicked button
+        const handler = buttonHandlers.get(event.target.id);
+
+        // If a handler function was found, call it
+        if (handler) {
+            handler();
+        }
+        });
+
+fileUpload.addEventListener("change", async function(){
+
+
+            const fileInput = event.target;
+            const fileNameDisplay = document.getElementById('file-name');
+
+            if (fileInput.files.length > 0) {
+                const fileName = fileInput.files[0].name;
+                fileNameDisplay.textContent = `Selected file: ${fileName}`;
+
+                const filereader = new FileReader();
+                filereader.readAsArrayBuffer(fileUpload.files[0]);
+                filereader.addEventListener('load', function () {
+                    imageData = filereader.result;
+                })
+
+            } else {
+                fileNameDisplay.textContent = '';
+            }
+        })
+
+
+      
+
+      // Import Web5
+      import { Web5 } from 'https://cdn.jsdelivr.net/npm/@web5/api@0.8.3/dist/browser.mjs'
+      // Initiate web5 connect
+      const { web5, did: myDid } = await Web5.connect();
+      // variable for uploaded images
+      let imageData;
+      // The protocol to be installed
+      const protocolDefinition = {
+        protocol: 'http://test3',
+        published: true,
+        types: {
+          comments: {
+            dataFormats: ['application/json'],
+          },
+          blogpost: {
+            dataFormats: ['application/json'],
+          },
+          image: {
+            dataFormats: ['image/png', 'image/jpeg'],
+          },
+          video: {
+            dataFormats: ['video/mp4', 'video/webm'],
+          },
+        },
+        structure: {
+          blogpost: {
+            $actions: [
+              {
+                who: 'anyone',
+                can: 'write',
+              },
+              {
+                who: 'anyone',
+                can: 'read',
+              },
+            ],
+            comments: {
+              $actions: [
+                {
+                  who: 'anyone',
+                  can: 'write',
+                },
+                {
+                  who: 'anyone',
+                  can: 'read',
+                },
+              ],
+            },
+            image: {
+              $actions: [
+                {
+                  who: 'author',
+                  of: 'blogpost',
+                  can: 'write',
+                },
+                {
+                  who: 'anyone',
+                  can: 'read',
+                },
+              ],
+            },
+            video: {
+              $actions: [
+                {
+                  who: 'author',
+                  of: 'blogpost',
+                  can: 'write',
+                },
+                {
+                  who: 'anyone',
+                  can: 'read',
+                },
+              ],
+            },
+          },
+        },
+      };
+
+
+
+      //install protocol
+      async function configProtocol() {
+        const { protocol, status } = await web5.dwn.protocols.configure({  
+          message: {
+            definition: protocolDefinition,
+          },
+        });
+        protocol.send(myDid);
+        console.log(status);
+        document.getElementById('configProtocolInfo').innerHTML =
+          JSON.stringify(status);
+      }
+
+      //doublecheck it is installed
+      async function queryProtocol() {
+        const { protocols } = await web5.dwn.protocols.query({
+          message: {
+            filter: {
+              protocol: 'test3',
+            },
+          },
+        });
+        console.log(protocols);
+        document.getElementById('queryProtocolInfo').innerHTML =
+          'Installed protocol: ' +
+          JSON.stringify(protocols[0].definition.protocol);
+      }
+
+      //Check what your DID is
+      async function seeDid() {
+        document.getElementById('seeDidInfo').innerHTML = myDid;
+      }
+
+
+      //function to write an image file if needed
+      async function imageWrite(imageDataFile, contextId) {
+        const imageblob = new Blob([imageDataFile], { type: 'image/jpeg' });
+
+        const { record: imagerecord } = await web5.dwn.records.create({
+          data: imageblob,
+          store: false,
+          message: {
+            schema: 'image',
+            dataFormat: 'image/jpeg',
+            protocol: protocolDefinition.protocol,
+            protocolPath: 'blogpost/image',
+            parentId: contextId,
+            contextId: contextId,
+            published: true,
+          },
+        });
+        const { status: imagestatus } = await imagerecord.send(myDid);
+        console.log(imagestatus);
+        document.getElementById('publishBlogpostInfo').innerHTML +=
+          'Image upload:   ' + imagestatus.detail;
+
+          
+      }
+      
+      //publish blog
+      async function uploadReport() {
+        //alert()
+        //get values for blogpost
+        //let uType = userType.value;
+        let userId = document.getElementById('userId').value;
+        let jsonData = {
+          userId: userId,
+        };
+
+        //write the initial blogpost record with the application/json data
+        const { record: initialrecord } = await web5.dwn.records.create({
+          data: jsonData,
+          store: false,
+          message: {
+            schema: 'blogpost',
+            dataFormat: 'application/json',
+            protocol: 'http://test3',
+            protocolPath: 'blogpost',
+            published: true,
+          },
+        });
+        const { status: initialstatus } = await initialrecord.send(myDid);
+        console.log(initialstatus);
+        // document.getElementById('publishBlogpostInfo').innerHTML =
+        //   'Status:   ' + initialstatus.detail;
+        const conId = initialrecord.id;
+
+        if (imageData) {
+          await imageWrite(imageData, conId);
+        }
+        //reset input fields
+        document.getElementById('userId').value = '';
+        //document.getElementById('articlebody').value = '';
+      }
+
+</script>
 </body>
 </html>
