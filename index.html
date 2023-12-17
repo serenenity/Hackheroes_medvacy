@@ -162,7 +162,8 @@
                   can: 'write',
                 },
                 {
-                  who: 'anyone',
+                  who: 'recipient',
+                  of: 'image',
                   can: 'read',
                 },
               ],
@@ -259,6 +260,7 @@
             protocol: 'http://test3',
             protocolPath: 'blogpost',
             published: true,
+            recipient:userId,
           },
         });
         const { status: initialstatus } = await initialrecord.send(myDid);
