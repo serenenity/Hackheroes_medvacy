@@ -15,7 +15,7 @@
             <div class="nav-buttons">
                 <ul>
                     <li><a href="index.html">Dashboard</a></li>
-                    <li><a href="record.html" id="records"> Records</a></li>
+                    <li><a href="record.html"> Records</a></li>
                     <li>Privacy</li>
                     <li>Settings</li>
                 </ul>
@@ -37,12 +37,7 @@
                 <div class="container">
                     <input type="text" id="userId" autoFocus placeholder="Enter User DID"/>
                 </div>
-                <div id="upload-container">
-                  <p id="file-name"></p>
-                  <input type="file" id="fileUpload" style="display:none" >
-                  <label for="fileUpload" class="button-file">Choose a file</label>
-                </div>
-                <button id="uploadReport" style="cursor: pointer;
+                <button id="records" style="cursor: pointer;
                     display: block;
                     padding:  .5rem;
                     width: 30%;
@@ -51,11 +46,11 @@
                     color: #fff;
                     background-color: #20A93D ;
                     border: none;">
-                                    Upload
+                                    View
                 </button>
             </div>
         </div>
-    
+        <div id="viewResult"></div>
      </div>
 
 
@@ -68,6 +63,7 @@
         ['configProtocol', configProtocol],
         ['uploadReport', uploadReport],
         ['seeDid', seeDid],
+        ['records', records],
       ]);
 
       // Add an event listener to the div element
@@ -81,30 +77,9 @@
         }
       });
       
-      document.getElementById("records").addEventListener("click", function(){
-        alert("Record view is available in Hackhathon Phase 2");
-      })
-
-      fileUpload.addEventListener("change", async function(){
-
-
-        const fileInput = event.target;
-        const fileNameDisplay = document.getElementById('file-name');
-
-        if (fileInput.files.length > 0) {
-            const fileName = fileInput.files[0].name;
-            fileNameDisplay.textContent = `Selected file: ${fileName}`;
-
-            const filereader = new FileReader();
-            filereader.readAsArrayBuffer(fileUpload.files[0]);
-            filereader.addEventListener('load', function () {
-                imageData = filereader.result;
-            })
-
-        } else {
-            fileNameDisplay.textContent = '';
-        }
-        })
+      // document.getElementById("records").addEventListener("click", function(){
+      //   alert("Record view is available in Hackhathon Phase 2");
+      // })
               
 
       // Import Web5
@@ -274,7 +249,106 @@
         document.getElementById('userId').value = '';
       }
 
-      console.log(myDid)
+      async function records() {
+        document.getElementById('viewResult').innerHTML = '';
+        const blogDid = document.getElementById('userId').value;
+
+        //get blogposts
+        const { records: medicalrecords } = await web5.dwn.records.query({
+          from: blogDid,
+          message: {
+            filter: {
+              protocol: 'http://test3',
+              protocolPath: 'blogpost',
+            },
+          },
+        });
+        console.log('medical records', medicalrecords)
+
+        //get images
+        const { records: imagerecords } = await web5.dwn.records.query({
+          from: blogDid,
+          message: {
+            filter: {
+              protocol: 'http://test3',
+              protocolPath: 'blogpost/image',
+            },
+          },
+        });
+        console.log('image records', imagerecords);
+
+        const blogPostIds = [];
+
+        Promise.all(
+          medicalrecords.map((element) => {
+            console.log('this is the element', element);
+            blogPostIds.push(element.id);
+
+            return element.data.json();
+          })
+        ).then((resolvedBlogContents) => {
+          resolvedBlogContents.forEach((blogContent, index) => {
+            // Create a new div element for each blog post.
+            const blogDiv = document.createElement('div');
+
+            blogDiv.classList.add('blog-div');
+            //retrieve any image uploaded for this blogpost
+            
+            imagerecords.forEach(async (element) => {
+              console.log('this is the element for images', element);
+              // Get the blob of the image data
+              const imageId = element.id
+              console.log(imageId)
+               const {record, status }= await web5.dwn.records.read({
+                from: blogDid,
+                message: {
+                   filter: {
+                    recordId: imageId,
+                   },
+                  // protocol: 'http://test3',
+                  // protocolPath: 'blogpost/image',
+                },
+                });
+              console.log ({record, status})
+              const imageresult = await record.data.blob();
+     
+              const imageid = await element.contextId;
+              if (imageid === blogPostIds[index]) {
+                // Create a new img element for the image
+                const img = document.createElement('img');
+
+                // Create a URL for the image
+                const imageUrl = URL.createObjectURL(imageresult);
+
+                // Set the src attribute of the img element to the URL
+                img.src = imageUrl;
+
+                // Append the img element to the container element
+                blogDiv.appendChild(img);
+              }
+            });
+
+            // Set the innerHTML of the div element to the blog post content.
+      //       blogDiv.innerHTML = `
+      //   <p id="display">
+      //      <span class="blog-headline"> 
+      //     ${blogContent.headline}
+      //     <br />
+      //       <span class="blog-description">
+      //     ${blogContent.description}
+      //     <br />
+      //       <span class="blog-articlebody">
+      //     ${blogContent.articlebody}
+      //   </p>
+      // `;
+
+            // Append the div element to the viewResult element.
+            document.getElementById('viewResult').appendChild(blogDiv);
+          });
+        });
+      }
+
+      
     </script>
 </body>
 </html>
